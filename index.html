@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pipeline de Campos – Toesca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
+<!-- MSAL para autenticación con Microsoft -->
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.26.1/lib/msal-browser.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f3f1ec;--panel:#fff;--border:#e2dfda;--border-light:#ece9e4;
+  --text:#1c1917;--muted:#78716c;--accent:#3d6b4f;--accent-hover:#2d5139;
+}
+body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+/* LOGIN SCREEN */
+.login-screen{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;z-index:9999;
+}
+.login-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:16px;
+  padding:48px 56px;text-align:center;max-width:380px;width:100%
+}
+.login-logo{font-size:32px;margin-bottom:16px}
+.login-card h1{font-size:22px;font-weight:700;letter-spacing:-.5px;margin-bottom:8px}
+.login-card p{font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:32px}
+.btn-ms{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:12px 20px;border:1px solid var(--border);border-radius:8px;
+  background:var(--panel);font-size:14px;font-weight:600;cursor:pointer;
+  font-family:inherit;color:var(--text);transition:all .15s
+}
+.btn-ms:hover{background:var(--bg);border-color:#bbb}
+.btn-ms svg{width:20px;height:20px;flex-shrink:0}
+.login-error{
+  margin-top:16px;font-size:12px;color:#dc2626;
+  background:#fef2f2;padding:10px;border-radius:6px;display:none
+}
+
+/* LOADING */
+.loading-screen{
+  position:fixed;inset:0;background:var(--bg);
+  display:none;align-items:center;justify-content:center;z-index:9998;
+  flex-direction:column;gap:16px
+}
+.loading-screen p{font-size:14px;color:var(--muted)}
+.spinner{
+  width:36px;height:36px;border:3px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-bar{
+  width:240px;height:4px;background:var(--border);border-radius:2px;overflow:hidden
+}
+.progress-fill{
+  height:100%;background:var(--accent);border-radius:2px;
+  width:0%;transition:width .3s
+}
+
+/* APP */
+.app{display:none;grid-template-columns:360px 1fr;height:100vh}
+
+.sidebar{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-scroll{overflow-y:auto;flex:1}
+
+.brand{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.brand-left h1{font-size:16px;font-weight:700;letter-spacing:-.3px}
+.brand-left p{font-size:11px;color:var(--muted);margin-top:2px}
+.btn-refresh{
+  background:none;border:1px solid var(--border);border-radius:6px;
+  padding:6px 10px;font-size:11px;cursor:pointer;font-family:inherit;
+  color:var(--muted);transition:all .15s
+}
+.btn-refresh:hover{border-color:var(--accent);color:var(--accent)}
+
+.stats-bar{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border)}
+.stat{padding:12px 14px;border-right:1px solid var(--border-light);text-align:center}
+.stat:last-child{border-right:none}
+.stat-val{font-size:17px;font-weight:700;letter-spacing:-.5px}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:1px}
+
+.section{padding:14px 22px}
+.section+.section{border-top:1px solid var(--border-light)}
+.section-title{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+
+input[type=text],input[type=number],select{
+  width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;
+  font-size:13px;font-family:inherit;background:var(--panel);color:var(--text);
+  transition:border-color .15s
+}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fg{margin-bottom:10px}
+.fg:last-child{margin-bottom:0}
+.fg label{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-bottom:4px}
+.btn-clear{background:none;border:none;color:var(--accent);font-size:12px;font-weight:500;cursor:pointer;padding:4px 0;font-family:inherit;margin-top:4px}
+.btn-clear:hover{text-decoration:underline}
+
+.list-section{border-top:1px solid var(--border)}
+.list-header{
+  padding:10px 22px;display:flex;justify-content:space-between;align-items:center;
+  position:sticky;top:0;background:var(--panel);z-index:2;border-bottom:1px solid var(--border-light)
+}
+.list-header span{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.campo-list{list-style:none}
+.campo-item{
+  padding:10px 22px;border-bottom:1px solid var(--border-light);cursor:pointer;
+  transition:background .1s;display:flex;justify-content:space-between;align-items:center
+}
+.campo-item:hover{background:rgba(61,107,79,.04)}
+.campo-item-name{font-size:13px;font-weight:500}
+.campo-item-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.campo-item-right{text-align:right;flex-shrink:0;margin-left:8px}
+.campo-item-ha{font-size:13px;font-weight:600}
+.campo-item-price{font-size:11px;color:var(--muted)}
+.stage-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;flex-shrink:0}
+
+/* No KMZ badge */
+.no-kmz{font-size:10px;color:#dc2626;background:#fef2f2;padding:2px 6px;border-radius:4px;margin-left:4px}
+
+.map-wrap{position:relative;height:100vh}
+#map{width:100%;height:100%}
+
+.drop-overlay{
+  position:absolute;inset:0;background:rgba(61,107,79,.12);
+  border:3px dashed var(--accent);display:none;align-items:center;
+  justify-content:center;z-index:1000;pointer-events:none
+}
+.drop-overlay.active{display:flex}
+.drop-overlay div{background:var(--panel);padding:20px 28px;border-radius:10px;font-weight:600;font-size:14px}
+
+.legend{
+  position:absolute;bottom:16px;right:16px;background:var(--panel);
+  border:1px solid var(--border);border-radius:10px;padding:14px 16px;
+  z-index:500;font-size:12px;box-shadow:0 2px 12px rgba(0,0,0,.06)
+}
+.legend h3{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+.legend-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.legend-row:last-child{margin-bottom:0}
+.legend-swatch{width:12px;height:12px;border-radius:3px}
+
+.leaflet-popup-content-wrapper{border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.leaflet-popup-content{margin:0;font-family:'DM Sans',system-ui,sans-serif;min-width:240px}
+.popup{padding:16px 18px}
+.popup-name{font-size:16px;font-weight:700;margin-bottom:6px;letter-spacing:-.3px}
+.popup-badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;margin-bottom:12px}
+.popup-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+.popup-field-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.popup-field-val{font-size:14px;font-weight:600;margin-top:1px}
+.popup-notes{margin-top:12px;padding-top:10px;border-top:1px solid var(--border-light);font-size:12px;color:var(--muted);line-height:1.5}
+.popup-link{display:block;margin-top:12px;font-size:12px;color:var(--accent);font-weight:500;text-decoration:none}
+.popup-link:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🌿</div>
+    <h1>Pipeline de Campos</h1>
+    <p>Iniciá sesión con tu cuenta de Toesca para ver el mapa del portafolio.</p>
+    <button class="btn-ms" id="btn-login">
+      <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+        <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+        <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+        <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      </svg>
+      Iniciar sesión con Microsoft
+    </button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loading-screen">
+  <div class="spinner"></div>
+  <p id="loading-msg">Cargando campos desde Dynamics...</p>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-left">
+        <h1>Pipeline de Campos</h1>
+        <p id="last-updated">Toesca Farmland</p>
+      </div>
+      <button class="btn-refresh" id="btn-refresh">↻ Actualizar</button>
+    </div>
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-val" id="s-count">0</div><div class="stat-lbl">Campos</div></div>
+      <div class="stat"><div class="stat-val" id="s-ha">0</div><div class="stat-lbl">Hectáreas</div></div>
+      <div class="stat"><div class="stat-val" id="s-usd">—</div><div class="stat-lbl">USD MM</div></div>
+    </div>
+    <div class="sidebar-scroll">
+      <div class="section">
+        <div class="section-title">Búsqueda</div>
+        <input type="text" id="f-search" placeholder="Nombre del campo..." />
+      </div>
+      <div class="section">
+        <div class="section-title">Filtros</div>
+        <div class="fg"><label>Etapa</label><select id="f-stage"><option value="">Todas</option></select></div>
+        <div class="fg"><label>Provincia / Zona</label><select id="f-province"><option value="">Todas</option></select></div>
+        <div class="fg">
+          <label>Precio (USD)</label>
+          <div class="row2">
+            <input type="number" id="f-pr-min" placeholder="Mín" />
+            <input type="number" id="f-pr-max" placeholder="Máx" />
+          </div>
+        </div>
+        <div class="fg">
+          <label>L/s</label>
+          <div class="row2">
+            <input type="number" id="f-ls-min" placeholder="Mín" />
+            <input type="number" id="f-ls-max" placeholder="Máx" />
+          </div>
+        </div>
+        <button class="btn-clear" id="btn-clear">Limpiar filtros</button>
+      </div>
+      <div class="list-section">
+        <div class="list-header">
+          <span>Campos filtrados</span>
+          <span id="list-count">0</span>
+        </div>
+        <ul class="campo-list" id="campo-list"></ul>
+      </div>
+    </div>
+  </aside>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="drop-overlay" id="drop-overlay"><div>Soltar KMZ para asociar al campo</div></div>
+    <div class="legend">
+      <h3>Etapa del pipeline</h3>
+      <div id="legend-items"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN
+// ═══════════════════════════════════════════════════════════════════
+const CONFIG = {
+  tenantId:  '1b864ebb-5042-431b-b88e-4faad5905d2f',
+  clientId:  '8bed90aa-36c7-4a11-b8f4-342280a8be8d',
+  dynamics:  'https://farmland.crm2.dynamics.com',
+  scopes:    ['https://farmland.crm2.dynamics.com/user_impersonation']
+};
+
+// Mapeo de valores numéricos de pipelinestatus a etiquetas
+// Ajustar según los valores reales de tu Dynamics
+const STAGE_MAP = {
+  500260000: { label: 'Incoming Leads',    color: '#94a3b8' },
+  500260001: { label: 'Backlog',           color: '#64748b' },
+  500260002: { label: 'Rejected',          color: '#ef4444' },
+  500260003: { label: 'On Deck',           color: '#f97316' },
+  500260004: { label: 'Early Interest',    color: '#eab308' },
+  500260005: { label: 'Screening',         color: '#3b82f6' },
+  500260006: { label: 'Due Diligence',     color: '#8b5cf6' },
+  500260007: { label: 'IC Approval',       color: '#06b6d4' },
+  500260008: { label: 'Closing',           color: '#10b981' },
+  500260009: { label: 'Portfolio',         color: '#16a34a' },
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// MSAL
+// ═══════════════════════════════════════════════════════════════════
+const msalConfig = {
+  auth: {
+    clientId: CONFIG.clientId,
+    authority: `https://login.microsoftonline.com/${CONFIG.tenantId}`,
+    redirectUri: window.location.href.split('?')[0].split('#')[0]
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+};
+
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+let currentAccount = null;
+
+async function initMsal() {
+  await msalInstance.initialize();
+  const response = await msalInstance.handleRedirectPromise();
+  if (response) {
+    currentAccount = response.account;
+    msalInstance.setActiveAccount(currentAccount);
+    return true;
+  }
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    currentAccount = accounts[0];
+    msalInstance.setActiveAccount(currentAccount);
+    return true;
+  }
+  return false;
+}
+
+async function getToken() {
+  try {
+    const result = await msalInstance.acquireTokenSilent({
+      scopes: CONFIG.scopes,
+      account: currentAccount
+    });
+    return result.accessToken;
+  } catch(e) {
+    const result = await msalInstance.acquireTokenPopup({ scopes: CONFIG.scopes });
+    return result.accessToken;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MAPA
+// ═══════════════════════════════════════════════════════════════════
+let map;
+function initMap() {
+  map = L.map('map', { zoomControl: true }).setView([-35.5, -71.2], 7);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO', maxZoom: 19
+  }).addTo(map);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ESTADO
+// ═══════════════════════════════════════════════════════════════════
+let allCampos = [];
+let layerGroups = new Map();
+
+// ═══════════════════════════════════════════════════════════════════
+// CARGA DESDE DYNAMICS
+// ═══════════════════════════════════════════════════════════════════
+function setProgress(pct, msg) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('loading-msg').textContent = msg;
+}
+
+async function fetchAllOpportunities(token) {
+  const fields = [
+    'name',
+    'opportunityid',
+    'cr0b1_kmz',
+    'cr0b1_kmz_name',
+    'cr0b1_pipelinestatus',
+    'cr0b1_offerprice',
+    'cr0b1_price',
+    'cr0b1_province_',
+    'cr0b1_ls',
+    'cr0b1_notes',
+    'cr0b1_latitud',
+    'cr0b1_longitud'
+  ].join(',');
+
+  let url = `${CONFIG.dynamics}/api/data/v9.2/opportunities?$select=${fields}&$orderby=name asc`;
+  let all = [];
+
+  while (url) {
+    const resp = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'OData-MaxVersion': '4.0',
+        'OData-Version': '4.0',
+        'Accept': 'application/json',
+        'Prefer': 'odata.maxpagesize=200'
+      }
+    });
+    if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+    const data = await resp.json();
+    all = all.concat(data.value || []);
+    url = data['@odata.nextLink'] || null;
+  }
+  return all;
+}
+
+async function fetchKmzFile(token, opportunityId, kmzFileId) {
+  // Los archivos en Dataverse se bajan así:
+  const url = `${CONFIG.dynamics}/api/data/v9.2/opportunities(${opportunityId})/cr0b1_kmz/$value`;
+  const resp = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!resp.ok) return null;
+  return await resp.arrayBuffer();
+}
+
+async function parseKmzBuffer(buffer) {
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const kmlName = Object.keys(zip.files).find(n => n.toLowerCase().endsWith('.kml'));
+    if (!kmlName) return null;
+    const kmlText = await zip.files[kmlName].async('string');
+    const xml = new DOMParser().parseFromString(kmlText, 'text/xml');
+    return toGeoJSON.kml(xml);
+  } catch(e) {
+    return null;
+  }
+}
+
+function extractGeometry(geojson) {
+  if (!geojson) return { polygons: [], centroid: null };
+  const polygons = [];
+  let lats = [], lngs = [];
+
+  geojson.features.forEach(f => {
+    if (!f.geometry) return;
+    const walkCoords = (coords) => {
+      if (typeof coords[0] === 'number') { lngs.push(coords[0]); lats.push(coords[1]); }
+      else coords.forEach(walkCoords);
+    };
+    walkCoords(f.geometry.coordinates);
+
+    if (f.geometry.type === 'Polygon') {
+      f.geometry.coordinates.forEach(ring =>
+        polygons.push(ring.map(c => [c[1], c[0]]))
+      );
+    } else if (f.geometry.type === 'MultiPolygon') {
+      f.geometry.coordinates.forEach(poly =>
+        poly.forEach(ring => polygons.push(ring.map(c => [c[1], c[0]])))
+      );
+    }
+  });
+
+  const centroid = lats.length
+    ? { lat: lats.reduce((a,b)=>a+b,0)/lats.length, lng: lngs.reduce((a,b)=>a+b,0)/lngs.length }
+    : null;
+
+  return { polygons, centroid };
+}
+
+async function loadFromDynamics() {
+  showLoading();
+  setProgress(5, 'Autenticando con Microsoft...');
+  const token = await getToken();
+
+  setProgress(20, 'Cargando oportunidades desde Dynamics...');
+  const opportunities = await fetchAllOpportunities(token);
+
+  // Solo las que tienen KMZ
+  const withKmz = opportunities.filter(o => o.cr0b1_kmz);
+  const total = withKmz.length;
+
+  setProgress(30, `Procesando ${total} campos con KMZ...`);
+
+  const campos = [];
+  for (let i = 0; i < withKmz.length; i++) {
+    const o = withKmz[i];
+    setProgress(30 + Math.round((i/total)*60), `Cargando KMZ: ${o.name || 'Campo ' + (i+1)}...`);
+
+    let polygons = [];
+    let centroid = null;
+
+    // Si ya tiene lat/lng usarla, si no bajar el KMZ
+    if (o.cr0b1_latitud && o.cr0b1_longitud) {
+      centroid = { lat: o.cr0b1_latitud, lng: o.cr0b1_longitud };
+    }
+
+    // Bajar KMZ para dibujar polígonos
+    try {
+      const buffer = await fetchKmzFile(token, o.opportunityid, o.cr0b1_kmz);
+      if (buffer) {
+        const geojson = await parseKmzBuffer(buffer);
+        const geo = extractGeometry(geojson);
+        polygons = geo.polygons;
+        if (!centroid && geo.centroid) centroid = geo.centroid;
+      }
+    } catch(e) {
+      console.warn(`KMZ error para ${o.name}:`, e);
+    }
+
+    const price = o.cr0b1_offerprice || o.cr0b1_price || null;
+    const stage = STAGE_MAP[o.cr0b1_pipelinestatus] || { label: 'Sin etapa', color: '#9ca3af' };
+
+    campos.push({
+      id: o.opportunityid,
+      name: o.name || 'Sin nombre',
+      stage: o.cr0b1_pipelinestatus,
+      stageLabel: stage.label,
+      stageColor: stage.color,
+      price,
+      province: o.cr0b1_province_ || null,
+      ls: o.cr0b1_ls || null,
+      notes: o.cr0b1_notes || '',
+      kmzName: o.cr0b1_kmz_name || '',
+      polygons,
+      centroid,
+      dynamicsUrl: `${CONFIG.dynamics}/main.aspx?pagetype=entityrecord&etn=opportunity&id=${o.opportunityid}`
+    });
+  }
+
+  setProgress(95, 'Dibujando mapa...');
+  allCampos = campos;
+  buildLegend();
+  populateOptions();
+  render();
+  setProgress(100, 'Listo');
+
+  const now = new Date().toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('last-updated').textContent = `Actualizado hoy a las ${now}`;
+  showApp();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDERIZADO
+// ═══════════════════════════════════════════════════════════════════
+function buildPopup(c) {
+  const priceFmt = c.price ? 'USD ' + c.price.toLocaleString('en-US') : '—';
+  const lsFmt = c.ls ? c.ls.toLocaleString('en-US') + ' L/s' : '—';
+  const provinceFmt = c.province || '—';
+  const notesFmt = c.notes ? `<div class="popup-notes">${c.notes}</div>` : '';
+
+  return `<div class="popup">
+    <div class="popup-name">${c.name}</div>
+    <span class="popup-badge" style="background:${c.stageColor}20;color:${c.stageColor}">${c.stageLabel}</span>
+    <div class="popup-grid">
+      <div><div class="popup-field-lbl">Precio</div><div class="popup-field-val">${priceFmt}</div></div>
+      <div><div class="popup-field-lbl">L/s</div><div class="popup-field-val">${lsFmt}</div></div>
+      <div><div class="popup-field-lbl">Zona</div><div class="popup-field-val">${provinceFmt}</div></div>
+      <div><div class="popup-field-lbl">KMZ</div><div class="popup-field-val" style="font-size:12px">${c.kmzName || '—'}</div></div>
+    </div>
+    ${notesFmt}
+    <a class="popup-link" href="${c.dynamicsUrl}" target="_blank">Ver en Dynamics →</a>
+  </div>`;
+}
+
+function drawCampo(c) {
+  const group = L.layerGroup();
+
+  c.polygons.forEach(ring => {
+    if (!ring || ring.length < 3) return;
+    L.polygon(ring, {
+      color: c.stageColor, weight: 2,
+      fillColor: c.stageColor, fillOpacity: 0.2
+    }).bindPopup(buildPopup(c)).addTo(group);
+  });
+
+  if (c.centroid) {
+    L.circleMarker([c.centroid.lat, c.centroid.lng], {
+      radius: 7, color: '#fff', weight: 2,
+      fillColor: c.stageColor, fillOpacity: 1
+    }).bindPopup(buildPopup(c)).addTo(group);
+  }
+
+  group.addTo(map);
+  layerGroups.set(c.id, group);
+}
+
+function clearAll() {
+  layerGroups.forEach(g => map.removeLayer(g));
+  layerGroups.clear();
+}
+
+function buildLegend() {
+  const stages = [...new Set(allCampos.map(c => c.cr0b1_pipelinestatus))];
+  const el = document.getElementById('legend-items');
+  const seen = new Set();
+  el.innerHTML = allCampos
+    .filter(c => { const k = c.stageLabel; if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a,b) => a.stageLabel.localeCompare(b.stageLabel))
+    .map(c => `<div class="legend-row">
+      <div class="legend-swatch" style="background:${c.stageColor}"></div>
+      <span>${c.stageLabel}</span>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FILTROS
+// ═══════════════════════════════════════════════════════════════════
+function getFiltered() {
+  const search = document.getElementById('f-search').value.toLowerCase().trim();
+  const stage = document.getElementById('f-stage').value;
+  const province = document.getElementById('f-province').value;
+  const prMin = parseFloat(document.getElementById('f-pr-min').value);
+  const prMax = parseFloat(document.getElementById('f-pr-max').value);
+  const lsMin = parseFloat(document.getElementById('f-ls-min').value);
+  const lsMax = parseFloat(document.getElementById('f-ls-max').value);
+
+  return allCampos.filter(c => {
+    if (search && !c.name.toLowerCase().includes(search)) return false;
+    if (stage && String(c.stage) !== stage) return false;
+    if (province && String(c.province) !== province) return false;
+    if (!isNaN(prMin) && (c.price || 0) < prMin) return false;
+    if (!isNaN(prMax) && (c.price || 0) > prMax) return false;
+    if (!isNaN(lsMin) && (c.ls || 0) < lsMin) return false;
+    if (!isNaN(lsMax) && (c.ls || 0) > lsMax) return false;
+    return true;
+  });
+}
+
+function updateStats(list) {
+  document.getElementById('s-count').textContent = list.length;
+  document.getElementById('s-ha').textContent = '—';
+  const total = list.reduce((s,c) => s + (c.price||0), 0);
+  document.getElementById('s-usd').textContent = total
+    ? Math.round(total/1e6).toLocaleString('en-US')
+    : '—';
+}
+
+function renderList(list) {
+  document.getElementById('list-count').textContent = list.length;
+  document.getElementById('campo-list').innerHTML = list.map(c => {
+    const priceFmt = c.price ? 'USD ' + (c.price/1e6).toFixed(1) + 'M' : '—';
+    const sub = [c.stageLabel, c.province].filter(Boolean).join(' · ');
+    return `<li class="campo-item" data-id="${c.id}">
+      <div style="min-width:0">
+        <div class="campo-item-name">
+          <span class="stage-dot" style="background:${c.stageColor}"></span>${c.name}
+        </div>
+        <div class="campo-item-sub">${sub || 'Sin info'}</div>
+      </div>
+      <div class="campo-item-right">
+        <div class="campo-item-price">${priceFmt}</div>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+function populateOptions() {
+  const fillSelect = (id, values, labelFn, placeholder) => {
+    const el = document.getElementById(id);
+    const cur = el.value;
+    const unique = [...new Set(values.filter(v => v != null))].sort();
+    el.innerHTML = `<option value="">${placeholder}</option>` +
+      unique.map(v => `<option value="${v}" ${String(v)===cur?'selected':''}>${labelFn(v)}</option>`).join('');
+  };
+  fillSelect('f-stage',
+    allCampos.map(c => c.stage),
+    v => STAGE_MAP[v]?.label || v,
+    'Todas las etapas'
+  );
+  fillSelect('f-province',
+    allCampos.map(c => c.province),
+    v => v,
+    'Todas las zonas'
+  );
+}
+
+function render() {
+  clearAll();
+  const filtered = getFiltered();
+  filtered.forEach(drawCampo);
+  updateStats(filtered);
+  renderList(filtered);
+}
+
+['f-search','f-stage','f-province','f-pr-min','f-pr-max','f-ls-min','f-ls-max'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', render);
+  el.addEventListener('change', render);
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  ['f-search','f-stage','f-province','f-pr-min','f-pr-max','f-ls-min','f-ls-max']
+    .forEach(id => document.getElementById(id).value = '');
+  render();
+});
+
+document.getElementById('campo-list').addEventListener('click', e => {
+  const li = e.target.closest('.campo-item');
+  if (!li) return;
+  const c = allCampos.find(x => x.id === li.dataset.id);
+  if (!c) return;
+  if (c.centroid) {
+    map.flyTo([c.centroid.lat, c.centroid.lng], 14, { duration: 0.8 });
+    setTimeout(() => {
+      const group = layerGroups.get(c.id);
+      if (group) group.eachLayer(l => { try { l.openPopup(); } catch(e){} });
+    }, 900);
+  }
+});
+
+document.getElementById('btn-refresh').addEventListener('click', loadFromDynamics);
+
+// ═══════════════════════════════════════════════════════════════════
+// UI STATE
+// ═══════════════════════════════════════════════════════════════════
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+}
+function showLoading() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'grid';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+initMap();
+
+document.getElementById('btn-login').addEventListener('click', async () => {
+  try {
+    document.getElementById('login-error').style.display = 'none';
+    const resp = await msalInstance.loginPopup({ scopes: CONFIG.scopes });
+    currentAccount = resp.account;
+    msalInstance.setActiveAccount(currentAccount);
+    await loadFromDynamics();
+  } catch(e) {
+    const errEl = document.getElementById('login-error');
+    errEl.style.display = 'block';
+    errEl.textContent = 'Error al iniciar sesión: ' + e.message;
+  }
+});
+
+(async () => {
+  await msalInstance.initialize();
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    currentAccount = accounts[0];
+    msalInstance.setActiveAccount(currentAccount);
+    await loadFromDynamics();
+  } else {
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>
