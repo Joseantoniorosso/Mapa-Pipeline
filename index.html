@@ -1289,7 +1289,6 @@ function renderFooter(filteredList){
   const noKmz=fields.filter(f=>f.hasKmz===false||(!f.hasKmz&&!f.polygons?.length&&!f.points?.length&&!f.lines?.length));
   const noKmzBadge=document.getElementById('nokmz-badge');
   if(noKmzBadge){noKmzBadge.style.display=noKmz.length?'inline':'none';const nc=document.getElementById('nokmz-count');if(nc)nc.textContent=noKmz.length;}
-  const used=FIELD_STAGES.filter(s=>vis.some(f=>f.stage===s.id));
   let used=[];
   sb.innerHTML=used.map(s=>{
     const sha=vis.filter(f=>f.stage===s.id).reduce((t,f)=>t+f.areaHa,0);
