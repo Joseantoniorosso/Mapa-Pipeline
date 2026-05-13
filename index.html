@@ -3847,7 +3847,7 @@ async function syncDynamics() {
 
     // Helper to extract data from a Dynamics opportunity record
     function extractOppData(o) {
-      const stageId = o.cr0b1_pipelinestatus != null ? (DYN_STAGE_MAP[o.cr0b1_pipelinestatus] || 'incoming_leads') : null;
+      const stageId = o.cr0b1_pipelinestatus != null ? (DYN_STAGE_MAP[o.cr0b1_pipelinestatus] || 'incoming_leads') : null; console.log('STAGE RAW:', o.name, o.cr0b1_pipelinestatus, 'MAPPED:', stageId); console.log('COMUNA RAW:', o.name, o.cr0b1_province_, JSON.stringify(o).substring(0,300));
       const fieldTypeId = o.cr0b1_fieldtype != null ? (DYN_FIELD_TYPE_MAP[o.cr0b1_fieldtype] || null) : null;
       const isoCode = (o.transactioncurrencyid?.isocurrencycode || '').toUpperCase();
       const isCLP = isoCode === 'CLP' || isoCode === 'PEN' || (isoCode !== 'USD' && isoCode !== '' && o.new_askingprice > 1000000);
