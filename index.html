@@ -1096,7 +1096,25 @@ function saveToStorage(){
     hasKmz:f.hasKmz||false,_kmzName:f._kmzName||'',
   }))));}catch(e){console.warn('localStorage full',e);}
 }
-
+function loadFromStorage(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(!raw) return false;
+    const data=JSON.parse(raw);
+    if(!Array.isArray(data)||!data.length) return false;
+    fields.length=0;
+    data.forEach(f=>{
+      const nf=newField(f);
+      nf.dynamicsId=f.dynamicsId||null;
+      nf.dynamicsUrl=f.dynamicsUrl||null;
+      nf.hasKmz=f.hasKmz||false;
+      nf._kmzName=f._kmzName||'';
+      fields.push(nf);
+    });
+    return true;
+  }catch(e){console.warn('loadFromStorage error',e);return false;}
+}
+  
 // ════════════════════════════════════════════════════════════════
 // FILTERS + SORT
 // ════════════════════════════════════════════════════════════════
