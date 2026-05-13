@@ -281,7 +281,7 @@ body.presentation .pres-exit{display:block;}
       <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8A5.5 5.5 0 112.5 8M13.5 8V5M13.5 8h-3"/></svg>
       <span id="dynamics-btn-label">Sincronizar Dynamics</span>
     </button>
-    <button class="hbtn" onclick="localStorage.removeItem('toesca_pipeline_blacklist');showToast('Blacklist limpiada — re-sincroniza')" style="font-size:9px;color:#b45309;border-color:#b45309" title="Limpiar lista de campos ignorados">⚠ Reset BL</button>
+    <button class="hbtn" onclick="showBlacklist()" style="font-size:9px;color:#b45309;border-color:#b45309" title="Ver campos ignorados">⚠ Lista negra</button>
   </div>
 </header>
 
@@ -1290,7 +1290,7 @@ function renderFooter(filteredList){
   const noKmzBadge=document.getElementById('nokmz-badge');
   if(noKmzBadge){noKmzBadge.style.display=noKmz.length?'inline':'none';const nc=document.getElementById('nokmz-count');if(nc)nc.textContent=noKmz.length;}
   const used=FIELD_STAGES.filter(s=>vis.some(f=>f.stage===s.id));
-  const sb=document.getElementById('stage-breakdown');
+  const used=[];
   sb.innerHTML=used.map(s=>{
     const sha=vis.filter(f=>f.stage===s.id).reduce((t,f)=>t+f.areaHa,0);
     const sn=vis.filter(f=>f.stage===s.id).length;
@@ -3624,6 +3624,18 @@ const DYN_STAGE_MAP = {
   500260009: 'ic_approval',
   500260010: 'invested',
   500260011: 'declined_after_dd',
+  0: 'incoming_leads',
+  1: 'backlog',
+  2: 'rejected',
+  3: 'on_deck',
+  4: 'early_interest',
+  5: 'screening',
+  6: 'due_diligence',
+  7: 'legal',
+  8: 'term_sheet',
+  9: 'ic_approval',
+  10: 'invested',
+  11: 'declined_after_dd',
 };
 
 // cr0b1_fieldtype option values — adjust if Dynamics uses different numbers
@@ -4116,6 +4128,24 @@ function closeDuplicatesPanel() {
 }
 
 setTimeout(detectDuplicates, 1500);
+
+function showBlacklist(){
+  const bl=getBlacklist();
+  const modal=document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML=`<div style="background:#faf8f4;border-radius:12px;padding:24px;max-width:400px;width:90%;font-family:inherit">
+    <div style="font-weight:600;font-size:15px;margin-bottom:12px">Campos en lista negra (${bl.length})</div>
+    <div style="max-height:300px;overflow-y:auto;margin-bottom:16px;font-size:13px">
+      ${bl.length?bl.map((b,i)=>`<div style="padding:6px 0;border-bottom:1px solid #e0d8c8;display:flex;justify-content:space-between"><span>${b}</span></div>`).join(''):'<div style="color:#888">Lista vacía</div>'}
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="padding:6px 14px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer">Cerrar</button>
+      <button onclick="if(confirm('¿Limpiar lista negra? Los campos eliminados volverán a aparecer al sincronizar.')){localStorage.removeItem('toesca_pipeline_blacklist');showToast('Lista negra limpiada');this.closest('div[style*=fixed]').remove();}" style="padding:6px 14px;border:1px solid #b45309;border-radius:6px;background:#fff;color:#b45309;cursor:pointer">🗑 Limpiar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+  
 </script>
 </body>
 </html>
