@@ -1080,7 +1080,7 @@ async function loadKMZ(file){
 // ════════════════════════════════════════════════════════════════
 // LOCALSTORAGE PERSISTENCE
 // ════════════════════════════════════════════════════════════════
-const LS_KEY='toesca_pipeline_v2';
+const LS_KEY='toesca_pipeline_v3';
 const BL_KEY = 'toesca_pipeline_blacklist'; // IDs/names of deleted fields
 function getBlacklist(){ try{ return JSON.parse(localStorage.getItem(BL_KEY)||'[]'); }catch(e){ return []; } }
 function addToBlacklist(f){ const bl=getBlacklist(); const key=f.dynamicsId||f.name; if(!bl.includes(key)){ bl.push(key); localStorage.setItem(BL_KEY,JSON.stringify(bl)); } }
