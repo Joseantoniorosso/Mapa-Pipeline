@@ -281,6 +281,7 @@ body.presentation .pres-exit{display:block;}
       <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8A5.5 5.5 0 112.5 8M13.5 8V5M13.5 8h-3"/></svg>
       <span id="dynamics-btn-label">Sincronizar Dynamics</span>
     </button>
+    <button class="hbtn" onclick="localStorage.removeItem('toesca_pipeline_blacklist');showToast('Blacklist limpiada — re-sincroniza')" style="font-size:9px;color:#b45309;border-color:#b45309" title="Limpiar lista de campos ignorados">⚠ Reset BL</button>
   </div>
 </header>
 
@@ -422,7 +423,7 @@ body.presentation .pres-exit{display:block;}
       <div id="dp-rows"></div>
     </div>
     <div class="map-tooltip" id="tooltip"></div>
-    <div class="map-legend" id="map-legend"><div class="legend-title">Etapa</div><div id="legend-rows"></div></div>
+    <div class="map-legend" id="map-legend" style="display:none"><div class="legend-title">Etapa</div><div id="legend-rows"></div></div>
     <!-- Price heatmap legend — shown only in heatmap mode -->
     <div id="heatmap-legend" style="display:none;position:absolute;bottom:28px;right:12px;background:rgba(250,248,244,.95);border:1px solid var(--border);border-radius:6px;padding:10px 14px;z-index:10;min-width:150px;backdrop-filter:blur(4px)">
       <div style="font-family:Consolas,monospace;font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:7px" id="hm-legend-title">USD/há Neto</div>
@@ -1091,15 +1092,9 @@ function saveToStorage(){
     crops:f.crops,fieldType:f.fieldType,stage:f.stage,priceTotal:f.priceTotal,
     visible:f.visible,notes:f.notes,polygons:f.polygons,lines:f.lines,points:f.points,
     fieldCode:f.fieldCode,region:f.region||'',comuna:f.comuna||'',
+    dynamicsId:f.dynamicsId||null,dynamicsUrl:f.dynamicsUrl||null,
+    hasKmz:f.hasKmz||false,_kmzName:f._kmzName||'',
   }))));}catch(e){console.warn('localStorage full',e);}
-}
-function loadFromStorage(){
-  try{
-    const raw=localStorage.getItem(LS_KEY);if(!raw)return false;
-    const data=JSON.parse(raw);
-    data.forEach(f=>fields.push(newField({...f,mapVisible:f.visible!==false})));
-    return data.length>0;
-  }catch(e){return false;}
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -3840,7 +3835,7 @@ async function syncDynamics() {
 
     // Helper to extract data from a Dynamics opportunity record
     function extractOppData(o) {
-      const stageId = DYN_STAGE_MAP[o.cr0b1_pipelinestatus] || 'pipeline_activo';
+      const stageId = (o.cr0b1_pipelinestatus != null ? DYN_STAGE_MAP[o.cr0b1_pipelinestatus] : null) || null;
       const fieldTypeId = o.cr0b1_fieldtype != null ? (DYN_FIELD_TYPE_MAP[o.cr0b1_fieldtype] || null) : null;
       const isoCode = (o.transactioncurrencyid?.isocurrencycode || '').toUpperCase();
       const isCLP = isoCode === 'CLP' || isoCode === 'PEN' || (isoCode !== 'USD' && isoCode !== '' && o.new_askingprice > 1000000);
@@ -3858,23 +3853,36 @@ async function syncDynamics() {
       const o = withKmz[i];
       setDynProgress(30 + Math.round((i/total)*55), `${o.name||'Predio '+(i+1)}...`);
 
-      const buf = await fetchDynKmz(token, o.opportunityid);
-      let polygons=[], lines=[], points=[];
-      if (buf) {
-        const kmlText = await parseKmzBuffer(buf);
-        const geo = extractKmlGeometry(kmlText);
-        polygons = geo.polygons; lines = geo.lines; points = geo.points;
-      }
-      if (!polygons.length && !points.length && o.cr0b1_latitud && o.cr0b1_longitud) {
-        points = [[o.cr0b1_latitud, o.cr0b1_longitud]];
-      }
-
-      const { stageId, fieldTypeId, price, regionName, zoneName, areaHaFromDyn } = extractOppData(o);
       const nameLower = (o.name||'').toLowerCase().trim();
       const existing = fields.find(f => (f.name||'').toLowerCase().trim() === nameLower);
 
+      // Check if KMZ needs re-download: skip if field already has geometry AND kmz name hasn't changed
+      const kmzName = o.cr0b1_kmz_name || '';
+      const hasGeometry = existing && (existing.polygons?.length || existing.points?.length);
+      const kmzUnchanged = existing && existing._kmzName === kmzName && kmzName && hasGeometry;
+
+      let polygons = existing?.polygons || [];
+      let lines    = existing?.lines    || [];
+      let points   = existing?.points   || [];
+
+      if (!kmzUnchanged) {
+        const buf = await fetchDynKmz(token, o.opportunityid);
+        if (buf) {
+          const kmlText = await parseKmzBuffer(buf);
+          const geo = extractKmlGeometry(kmlText);
+          if (geo.polygons.length || geo.lines.length || geo.points.length) {
+            polygons = geo.polygons; lines = geo.lines; points = geo.points;
+          }
+        }
+        if (!polygons.length && !points.length && o.cr0b1_latitud && o.cr0b1_longitud) {
+          points = [[o.cr0b1_latitud, o.cr0b1_longitud]];
+        }
+      }
+
+      const { stageId, fieldTypeId, price, regionName, zoneName, areaHaFromDyn } = extractOppData(o);
+
       if (existing) {
-        if (polygons.length) { existing.polygons = polygons; existing.lines = lines; existing.points = points; }
+        if (!kmzUnchanged) { existing.polygons = polygons; existing.lines = lines; existing.points = points; }
         if (stageId) existing.stage = stageId;
         if (fieldTypeId) existing.fieldType = fieldTypeId;
         if (price) existing.priceTotal = price;
@@ -3887,14 +3895,15 @@ async function syncDynamics() {
         existing.dynamicsUrl = `${DYN_CONFIG.dynamics}/main.aspx?pagetype=entityrecord&etn=opportunity&id=${o.opportunityid}`;
         existing.mapVisible = existing.visible !== false;
         existing.hasKmz = true;
+        existing._kmzName = kmzName;
         if (!existing.areaHa && polygons.length) existing.areaHa = calcHa(polygons[0]);
         updated++;
       } else {
         const areaHa = polygons.length ? calcHa(polygons[0]) : 0;
         fields.push(newField({
           name: o.name || 'Sin nombre',
-          filename: o.cr0b1_kmz_name || '',
-          stage: stageId || 'pipeline_activo',
+          filename: kmzName,
+          stage: stageId || 'incoming_leads',
           priceTotal: price,
           region: regionName,
           comuna: zoneName,
@@ -3905,13 +3914,13 @@ async function syncDynamics() {
           fieldType: fieldTypeId || 'brownfield',
           visible: true, mapVisible: true,
           hasKmz: true,
+          _kmzName: kmzName,
           dynamicsId: o.opportunityid,
           dynamicsUrl: `${DYN_CONFIG.dynamics}/main.aspx?pagetype=entityrecord&etn=opportunity&id=${o.opportunityid}`,
         }));
         added++;
       }
     }
-
     // ── Process fields WITHOUT KMZ ───────────────────────────────
     for (let i = 0; i < withoutKmz.length; i++) {
       const o = withoutKmz[i];
@@ -3942,7 +3951,7 @@ async function syncDynamics() {
         fields.push(newField({
           name: o.name || 'Sin nombre',
           filename: '',
-          stage: stageId || 'pipeline_activo',
+          stage: stageId || 'incoming_leads',
           priceTotal: price,
           region: regionName,
           comuna: zoneName,
