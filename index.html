@@ -1290,7 +1290,7 @@ function renderFooter(filteredList){
   const noKmzBadge=document.getElementById('nokmz-badge');
   if(noKmzBadge){noKmzBadge.style.display=noKmz.length?'inline':'none';const nc=document.getElementById('nokmz-count');if(nc)nc.textContent=noKmz.length;}
   let used=[];
-  sb.innerHTML=used.map(s=>{
+  const sb=document.getElementById('stage-breakdown'); if(!sb) return; sb.innerHTML=used.map(s=>{
     const sha=vis.filter(f=>f.stage===s.id).reduce((t,f)=>t+f.areaHa,0);
     const sn=vis.filter(f=>f.stage===s.id).length;
     return`<div class="sbd-row"><div class="sbd-label"><div class="sbd-dot" style="background:${s.color}"></div>${s.label}</div><div class="sbd-val">${sha>0?fmtN(sha)+' ha':sn+'c'}</div></div>`;
@@ -3993,6 +3993,7 @@ async function syncDynamics() {
           dynamicsUrl: `${DYN_CONFIG.dynamics}/main.aspx?pagetype=entityrecord&etn=opportunity&id=${o.opportunityid}`,
         }));
         added++;
+        console.table(fields.slice(0,5).map(f=>({name:f.name, stage:f.stage, dynamicsId:f.dynamicsId})));
       }
     }
 
