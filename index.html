@@ -1298,7 +1298,7 @@ function renderFooter(filteredList){
   }).join('');
 }
 
-function renderLegend(){
+function renderLegend(){ /* legend disabled */ }
   const used=FIELD_STAGES.filter(s=>fields.some(f=>f.stage===s.id));
   const el=document.getElementById('map-legend');
   if(!used.length){el.style.display='none';return;}
@@ -3853,7 +3853,7 @@ async function syncDynamics() {
 
     // Helper to extract data from a Dynamics opportunity record
     function extractOppData(o) {
-      const stageId = (o.cr0b1_pipelinestatus != null ? DYN_STAGE_MAP[o.cr0b1_pipelinestatus] : null) || null;
+      const stageId = o.cr0b1_pipelinestatus != null ? (DYN_STAGE_MAP[o.cr0b1_pipelinestatus] || 'incoming_leads') : null;
       const fieldTypeId = o.cr0b1_fieldtype != null ? (DYN_FIELD_TYPE_MAP[o.cr0b1_fieldtype] || null) : null;
       const isoCode = (o.transactioncurrencyid?.isocurrencycode || '').toUpperCase();
       const isCLP = isoCode === 'CLP' || isoCode === 'PEN' || (isoCode !== 'USD' && isoCode !== '' && o.new_askingprice > 1000000);
@@ -3904,7 +3904,7 @@ async function syncDynamics() {
         const { stageId, fieldTypeId, price, regionName, zoneName, areaHaFromDyn } = extractOppData(o);
         if (existing) {
           if (!kmzUnchanged) { existing.polygons = polygons; existing.lines = lines; existing.points = points; }
-          if (stageId) existing.stage = stageId;
+          existing.stage = stageId || existing.stage;
           if (fieldTypeId) existing.fieldType = fieldTypeId;
           if (price) existing.priceTotal = price;
           if (regionName) existing.region = regionName;
@@ -3956,7 +3956,7 @@ async function syncDynamics() {
       const existing = fields.find(f => (f.name||'').toLowerCase().trim() === nameLower);
 
       if (existing) {
-        if (stageId) existing.stage = stageId;
+        existing.stage = stageId || existing.stage;
         if (fieldTypeId) existing.fieldType = fieldTypeId;
         if (price) existing.priceTotal = price;
         if (regionName) existing.region = regionName;
