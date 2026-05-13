@@ -3866,15 +3866,11 @@ async function syncDynamics() {
       return { stageId, fieldTypeId, price, regionName, zoneName, areaHaFromDyn };
     }
 
-    // ── Process fields WITH KMZ ──────────────────────────────────
-    for (let i = 0; i < withKmz.length; i++) {
-      const o = withKmz[i];
-      setDynProgress(30 + Math.round((i/total)*55), `${o.name||'Predio '+(i+1)}...`);
-
+   // ── Process fields WITH KMZ — parallel batches ───────────────
+    const BATCH = 8; // concurrent downloads
+    async function processOneKmz(o, i) {
       const nameLower = (o.name||'').toLowerCase().trim();
       const existing = fields.find(f => (f.name||'').toLowerCase().trim() === nameLower);
-
-      // Check if KMZ needs re-download: skip if field already has geometry AND kmz name hasn't changed
       const kmzName = o.cr0b1_kmz_name || '';
       const hasGeometry = existing && (existing.polygons?.length || existing.points?.length);
       const kmzUnchanged = existing && existing._kmzName === kmzName && kmzName && hasGeometry;
@@ -3896,47 +3892,55 @@ async function syncDynamics() {
           points = [[o.cr0b1_latitud, o.cr0b1_longitud]];
         }
       }
+      return { o, kmzName, kmzUnchanged, polygons, lines, points, existing };
+    }
 
-      const { stageId, fieldTypeId, price, regionName, zoneName, areaHaFromDyn } = extractOppData(o);
+    for (let i = 0; i < withKmz.length; i += BATCH) {
+      const batch = withKmz.slice(i, i + BATCH);
+      setDynProgress(30 + Math.round((i/total)*55), `Descargando ${i+1}–${Math.min(i+BATCH,withKmz.length)} de ${withKmz.length}...`);
+      const results = await Promise.all(batch.map((o, j) => processOneKmz(o, i+j)));
 
-      if (existing) {
-        if (!kmzUnchanged) { existing.polygons = polygons; existing.lines = lines; existing.points = points; }
-        if (stageId) existing.stage = stageId;
-        if (fieldTypeId) existing.fieldType = fieldTypeId;
-        if (price) existing.priceTotal = price;
-        if (regionName) existing.region = regionName;
-        if (zoneName) existing.comuna = zoneName;
-        if (areaHaFromDyn) existing.areaHa = areaHaFromDyn;
-        if (o.cr0b1_ls) existing.ls = o.cr0b1_ls;
-        if (o.cr0b1_notes) existing.notes = o.cr0b1_notes;
-        existing.dynamicsId = o.opportunityid;
-        existing.dynamicsUrl = `${DYN_CONFIG.dynamics}/main.aspx?pagetype=entityrecord&etn=opportunity&id=${o.opportunityid}`;
-        existing.mapVisible = existing.visible !== false;
-        existing.hasKmz = true;
-        existing._kmzName = kmzName;
-        if (!existing.areaHa && polygons.length) existing.areaHa = calcHa(polygons[0]);
-        updated++;
-      } else {
-        const areaHa = polygons.length ? calcHa(polygons[0]) : 0;
-        fields.push(newField({
-          name: o.name || 'Sin nombre',
-          filename: kmzName,
-          stage: stageId || 'incoming_leads',
-          priceTotal: price,
-          region: regionName,
-          comuna: zoneName,
-          areaHa: areaHaFromDyn || areaHa || 0,
-          ls: o.cr0b1_ls || null,
-          notes: o.cr0b1_notes || '',
-          polygons, lines, points,
-          fieldType: fieldTypeId || 'brownfield',
-          visible: true, mapVisible: true,
-          hasKmz: true,
-          _kmzName: kmzName,
-          dynamicsId: o.opportunityid,
-          dynamicsUrl: `${DYN_CONFIG.dynamics}/main.aspx?pagetype=entityrecord&etn=opportunity&id=${o.opportunityid}`,
-        }));
-        added++;
+      for (const { o, kmzName, kmzUnchanged, polygons, lines, points, existing } of results) {
+        const { stageId, fieldTypeId, price, regionName, zoneName, areaHaFromDyn } = extractOppData(o);
+        if (existing) {
+          if (!kmzUnchanged) { existing.polygons = polygons; existing.lines = lines; existing.points = points; }
+          if (stageId) existing.stage = stageId;
+          if (fieldTypeId) existing.fieldType = fieldTypeId;
+          if (price) existing.priceTotal = price;
+          if (regionName) existing.region = regionName;
+          if (zoneName) existing.comuna = zoneName;
+          if (areaHaFromDyn) existing.areaHa = areaHaFromDyn;
+          if (o.cr0b1_ls) existing.ls = o.cr0b1_ls;
+          if (o.cr0b1_notes) existing.notes = o.cr0b1_notes;
+          existing.dynamicsId = o.opportunityid;
+          existing.dynamicsUrl = `${DYN_CONFIG.dynamics}/main.aspx?pagetype=entityrecord&etn=opportunity&id=${o.opportunityid}`;
+          existing.mapVisible = existing.visible !== false;
+          existing.hasKmz = true;
+          existing._kmzName = kmzName;
+          if (!existing.areaHa && polygons.length) existing.areaHa = calcHa(polygons[0]);
+          updated++;
+        } else {
+          const areaHa = polygons.length ? calcHa(polygons[0]) : 0;
+          fields.push(newField({
+            name: o.name || 'Sin nombre',
+            filename: kmzName,
+            stage: stageId || 'incoming_leads',
+            priceTotal: price,
+            region: regionName,
+            comuna: zoneName,
+            areaHa: areaHaFromDyn || areaHa || 0,
+            ls: o.cr0b1_ls || null,
+            notes: o.cr0b1_notes || '',
+            polygons, lines, points,
+            fieldType: fieldTypeId || 'brownfield',
+            visible: true, mapVisible: true,
+            hasKmz: true,
+            _kmzName: kmzName,
+            dynamicsId: o.opportunityid,
+            dynamicsUrl: `${DYN_CONFIG.dynamics}/main.aspx?pagetype=entityrecord&etn=opportunity&id=${o.opportunityid}`,
+          }));
+          added++;
+        }
       }
     }
     // ── Process fields WITHOUT KMZ ───────────────────────────────
