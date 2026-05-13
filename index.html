@@ -1298,12 +1298,7 @@ function renderFooter(filteredList){
   }).join('');
 }
 
-function renderLegend(){ /* legend disabled */ }
-  const used=FIELD_STAGES.filter(s=>fields.some(f=>f.stage===s.id));
-  const el=document.getElementById('map-legend');
-  if(!used.length){el.style.display='none';return;}
-  el.style.display='block';
-  document.getElementById('legend-rows').innerHTML=used.map(s=>`<div class="legend-row"><div class="legend-sw" style="background:${s.color}"></div>${s.label}</div>`).join('');
+function renderLegend(){ }
 }
 
 function renderAll(){renderChips();applyFilters();}
