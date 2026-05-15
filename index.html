@@ -134,7 +134,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .zoom-btn:hover{background:var(--ink);color:var(--paper);}
 
 /* detail panel */
-.detail-panel{position:absolute;bottom:24px;left:12px;width:230px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;z-index:10;box-shadow:0 4px 24px rgba(0,0,0,.12);display:none;}
+.detail-panel{position:absolute;bottom:24px;left:12px;width:260px;min-width:200px;max-width:420px;max-height:70vh;overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;z-index:10;box-shadow:0 4px 24px rgba(0,0,0,.12);display:none;resize:both;cursor:default;}
 .detail-panel.visible{display:block;}
 .dp-name{font-family:Georgia,'Times New Roman',serif;font-size:14px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);padding-right:14px;}
 .dp-row{display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;}
@@ -144,7 +144,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .map-tooltip{position:absolute;background:var(--ink);color:var(--paper);padding:3px 9px;border-radius:4px;font-family:Consolas,Menlo,'Liberation Mono','Courier New',monospace;font-size:9px;letter-spacing:.04em;pointer-events:none;display:none;z-index:20;white-space:nowrap;}
 
 /* legend */
-.map-legend{position:absolute;bottom:28px;left:12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:9px 12px;z-index:10;min-width:130px;display:none;}
+.map-legend{position:absolute;bottom:28px;left:12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:9px 12px;z-index:10;min-width:130px;display:none;cursor:move;user-select:none;}
 .legend-title{font-family:Consolas,Menlo,'Liberation Mono','Courier New',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
 .legend-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-family:Consolas,Menlo,'Liberation Mono','Courier New',monospace;font-size:9px;color:var(--ink);}
 .legend-row:last-child{margin-bottom:0;}
@@ -406,6 +406,7 @@ body.presentation .pres-exit{display:block;}
       <button class="map-btn" id="btn-sat" onclick="setLayer('sat')">Satélite</button>
       <button class="map-btn" id="btn-hillsh" onclick="setLayer('hillsh')" title="Superponer sombreado de relieve">⛰ Relieve</button>
       <button class="map-btn" onclick="fitAll()">↗ Fit</button>
+      <button class="map-btn" onclick="toggleLegend()" title="Mostrar/ocultar leyenda de etapas">⬤ Etapas</button>
       <!-- heatmap controls — shown only in analysis mode -->
       <div id="heatmap-controls" style="display:none;margin-top:4px;display:none;flex-direction:column;gap:3px">
         <button class="map-btn" id="btn-hm-relative" onclick="setHeatmapMode('relative')" title="Verde=barato · Rojo=caro vs promedio">vs Avg</button>
@@ -423,7 +424,7 @@ body.presentation .pres-exit{display:block;}
       <div id="dp-rows"></div>
     </div>
     <div class="map-tooltip" id="tooltip"></div>
-    <div class="map-legend" id="map-legend" style="display:none"><div class="legend-title">Etapa</div><div id="legend-rows"></div></div>
+    <div class="map-legend" id="map-legend" style="display:none"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div class="legend-title" style="margin-bottom:0">Etapas</div><button onclick="document.getElementById('map-legend').style.display='none'" style="background:none;border:none;font-size:12px;color:var(--muted);cursor:pointer;line-height:1;padding:0 0 0 8px">×</button></div><div id="legend-rows"></div></div>
     <!-- Price heatmap legend — shown only in heatmap mode -->
     <div id="heatmap-legend" style="display:none;position:absolute;bottom:28px;right:12px;background:rgba(250,248,244,.95);border:1px solid var(--border);border-radius:6px;padding:10px 14px;z-index:10;min-width:150px;backdrop-filter:blur(4px)">
       <div style="font-family:Consolas,monospace;font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:7px" id="hm-legend-title">USD/há Neto</div>
@@ -1080,9 +1081,9 @@ async function loadKMZ(file){
 // ════════════════════════════════════════════════════════════════
 const LS_KEY='toesca_pipeline_v3';
 const BL_KEY = 'toesca_pipeline_blacklist'; // IDs/names of deleted fields
-function getBlacklist(){ try{ return JSON.parse(localStorage.getItem(BL_KEY)||'[]'); }catch(e){ return []; } }
-function addToBlacklist(f){ const bl=getBlacklist(); const key=f.dynamicsId||f.name; if(!bl.includes(key)){ bl.push(key); localStorage.setItem(BL_KEY,JSON.stringify(bl)); } }
-function isBlacklisted(o){ const bl=getBlacklist(); return bl.includes(o.opportunityid)||bl.includes((o.name||'').trim()); }
+function getBlacklist(){ try{ return (JSON.parse(localStorage.getItem(BL_KEY)||'[]')).map(e=>typeof e==='string'?{key:e,name:e}:e); }catch(e){ return []; } }
+function addToBlacklist(f){ const bl=getBlacklist(); const key=f.dynamicsId||f.name; if(!bl.find(e=>e.key===key)){ bl.push({key, name: f.name||key}); localStorage.setItem(BL_KEY,JSON.stringify(bl)); } }
+function isBlacklisted(o){ const bl=getBlacklist(); return bl.some(e=>e.key===o.opportunityid||e.key===(o.name||'').trim()); }
 
 function saveToStorage(){
   try{localStorage.setItem(LS_KEY,JSON.stringify(fields.map(f=>({
@@ -1295,8 +1296,29 @@ function renderFooter(filteredList){
   }).join('');
 }
 
-function renderLegend(){ }
-
+function renderLegend(){
+  const el=document.getElementById('map-legend');
+  const rows=document.getElementById('legend-rows');
+  if(!el||!rows)return;
+  const used=FIELD_STAGES.filter(s=>fields.some(f=>f.stage===s.id&&f.visible!==false));
+  if(!used.length){el.style.display='none';return;}
+  rows.innerHTML=used.map(s=>`<div class="legend-row"><div class="legend-sw" style="background:${s.color}"></div>${s.label}</div>`).join('');
+  if(el.style.display==='none'||!el._initDrag){
+    el.style.display='block';
+    if(!el._initDrag){
+      el._initDrag=true;
+      let ox=0,oy=0,sx=0,sy=0,dragging=false;
+      el.addEventListener('mousedown',e=>{if(e.target.tagName==='BUTTON')return;dragging=true;sx=e.clientX;sy=e.clientY;const r=el.getBoundingClientRect();ox=r.left;oy=r.top;document.addEventListener('mousemove',mv);document.addEventListener('mouseup',()=>{dragging=false;document.removeEventListener('mousemove',mv);},{once:true});});
+      function mv(e){if(!dragging)return;const dx=e.clientX-sx,dy=e.clientY-sy;el.style.left=(ox+dx)+'px';el.style.top=(oy+dy)+'px';el.style.bottom='auto';}
+    }
+  }
+}
+function toggleLegend(){
+  const el=document.getElementById('map-legend');
+  if(!el)return;
+  if(el.style.display==='none'||el.style.display===''){renderLegend();}
+  else{el.style.display='none';}
+}
 function renderAll(){renderChips();applyFilters();}
 
 // focus field
@@ -1317,11 +1339,12 @@ function showDetail(f){
   const cropRows=Object.entries(f.crops||{}).filter(([,ha])=>parseFloat(ha)>0).map(([id,ha])=>{const c=getCrop(id);if(!c)return'';return`<div class="dp-row"><span class="dp-key" style="color:${c.color}">${c.label}</span><span class="dp-val">${ha} há</span></div>`;}).join('');
   document.getElementById('dp-rows').innerHTML=`
     ${f.region||f.comuna?`<div class="dp-row"><span class="dp-key">Ubicación</span><span class="dp-val" style="text-align:right">${[f.comuna,f.region].filter(Boolean).join(', ')}</span></div>`:''}
+    ${stage?`<div class="dp-row"><span class="dp-key">Etapa</span><span class="dp-val" style="color:${stage.color}">● ${stage.label}</span></div>`:''}
+    ${ftype?`<div class="dp-row"><span class="dp-key">Tipo</span><span class="dp-val" style="color:${ftype.color}">${ftype.label}</span></div>`:''}
     <div class="dp-row"><span class="dp-key">Ha Gross</span><span class="dp-val">${fmtHa(f.areaHa)}</span></div>
     ${pl>0?`<div class="dp-row"><span class="dp-key">Ha Plantable</span><span class="dp-val">${fmtHa(pl)}</span></div>`:''}
     ${f.ls?`<div class="dp-row"><span class="dp-key">Agua (L/s)</span><span class="dp-val">${f.ls}</span></div>`:''}
-    ${stage?`<div class="dp-row"><span class="dp-key">Etapa</span><span class="dp-val" style="color:${stage.color}">● ${stage.label}</span></div>`:''}
-    ${ftype?`<div class="dp-row"><span class="dp-key">Tipo</span><span class="dp-val" style="color:${ftype.color}">${ftype.label}</span></div>`:''}
+    ${f.fieldCode?`<div class="dp-row"><span class="dp-key">Código</span><span class="dp-val">${f.fieldCode}</span></div>`:''}
     ${noKmz?`<div class="dp-row"><span class="dp-key">KMZ</span><span class="dp-val" style="color:#b45309">Sin KMZ</span></div>`:''}
     ${f.priceTotal?`<div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--border)">
       <div class="dp-row"><span class="dp-key">USD Total</span><span class="dp-val">${fmtUSD(f.priceTotal)}</span></div>
@@ -4193,7 +4216,7 @@ function showBlacklist(){
   modal.innerHTML=`<div style="background:#faf8f4;border-radius:12px;padding:24px;max-width:400px;width:90%;font-family:inherit">
     <div style="font-weight:600;font-size:15px;margin-bottom:12px">Campos en lista negra (${bl.length})</div>
     <div style="max-height:300px;overflow-y:auto;margin-bottom:16px;font-size:13px">
-      ${bl.length?bl.map((b,i)=>`<div style="padding:6px 0;border-bottom:1px solid #e0d8c8;display:flex;justify-content:space-between"><span>${b}</span></div>`).join(''):'<div style="color:#888">Lista vacía</div>'}
+      ${bl.length?bl.map((b,i)=>`<div style="padding:6px 0;border-bottom:1px solid #e0d8c8;display:flex;justify-content:space-between"><span style="font-weight:500">${b.name}</span><span style="font-size:10px;color:#aaa;margin-left:10px">${b.key!==b.name?b.key:''}</span></div>`).join(''):'<div style="color:#888">Lista vacía</div>'}
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="this.closest('div[style*=fixed]').remove()" style="padding:6px 14px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer">Cerrar</button>
