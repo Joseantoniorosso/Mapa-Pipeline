@@ -3717,7 +3717,7 @@ async function fetchDynOpportunities(token) {
     'cr0b1_province_','new_region','cr0b1_ls','cr0b1_notes',
     'cr0b1_latitud','cr0b1_longitud','new_surfaceha','cr0b1_fieldtype',
     'transactioncurrencyid','cr0b1_price_base'].join(',');
-  let url = `${DYN_CONFIG.dynamics}/api/data/v9.2/opportunities?$select=${sel}&$expand=transactioncurrencyid($select=isocurrencycode,currencyname),stageid_processstage($select=stagename,stageid)&$orderby=name asc`;
+  let url = `${DYN_CONFIG.dynamics}/api/data/v9.2/opportunities?$select=${sel}&$expand=transactioncurrencyid($select=isocurrencycode,currencyname)&$orderby=name asc`;
   let all = [];
   while (url) {
     const resp = await fetch(url, { headers: {
