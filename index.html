@@ -3713,11 +3713,11 @@ function showDynOverlay(show) {
 
 async function fetchDynOpportunities(token) {
   const sel = ['name','opportunityid','cr0b1_kmz','cr0b1_kmz_name',
-    'cr0b1_pipelinestatus','cr0b1_pipelinestatus_value','new_pipelinestatus','cr0b1_offerprice','cr0b1_price','new_askingprice',
+    'cr0b1_pipelinestatus','cr0b1_offerprice','cr0b1_price','new_askingprice',
     'cr0b1_province_','new_region','cr0b1_ls','cr0b1_notes',
-    'cr0b1_latitud','cr0b1_longitud','new_surfaceha',
-    'transactioncurrencyid','cr0b1_price_base'].join(',');
-  let url = `${DYN_CONFIG.dynamics}/api/data/v9.2/opportunities?$select=${sel}&$expand=transactioncurrencyid($select=isocurrencycode,currencyname)&$orderby=name asc`;
+    'cr0b1_latitud','cr0b1_longitud','new_surfaceha','cr0b1_fieldtype',
+    'transactioncurrencyid','cr0b1_price_base','stageid'].join(',');
+  let url = `${DYN_CONFIG.dynamics}/api/data/v9.2/opportunities?$select=${sel}&$expand=transactioncurrencyid($select=isocurrencycode,currencyname),stageid_processstage($select=stagename)&$orderby=name asc`;
   let all = [];
   while (url) {
     const resp = await fetch(url, { headers: {
@@ -3856,7 +3856,10 @@ async function syncDynamics() {
 
     // Helper to extract data from a Dynamics opportunity record
     function extractOppData(o) {
-      const stageId = o.cr0b1_pipelinestatus != null ? (DYN_STAGE_MAP[o.cr0b1_pipelinestatus] || 'incoming_leads') : o['cr0b1_pipelinestatus_value'] != null ? (DYN_STAGE_MAP[o['cr0b1_pipelinestatus_value']] || 'incoming_leads') : o.new_pipelinestatus != null ? (DYN_STAGE_MAP[o.new_pipelinestatus] || 'incoming_leads') : null; console.log('STAGE RAW:', o.name, o.cr0b1_pipelinestatus, o['cr0b1_pipelinestatus_value'], o.new_pipelinestatus, 'MAPPED:', stageId);
+      const rawStage = (o.stageid_processstage?.stagename || '').toLowerCase().trim();
+      const STAGE_NAME_MAP = {'01. incoming leads':'incoming_leads','02. backlog':'backlog','03. rejected':'rejected','03.1. declined after dd':'declined_after_dd','04. on deck':'on_deck','05. early interest':'early_interest','06. screening':'screening','07. due diligence':'due_diligence','08. legal':'legal','09. term sheet':'term_sheet','10. ic approval':'ic_approval','11. invested':'invested','inversión':'inversion','inversion':'inversion'};
+      const stageId = STAGE_NAME_MAP[rawStage] || (o.cr0b1_pipelinestatus != null ? DYN_STAGE_MAP[o.cr0b1_pipelinestatus] : null) || null;
+      console.log('STAGE:', o.name, rawStage, '->', stageId);
       const fieldTypeId = o.cr0b1_fieldtype != null ? (DYN_FIELD_TYPE_MAP[o.cr0b1_fieldtype] || null) : null;
       const isoCode = (o.transactioncurrencyid?.isocurrencycode || '').toUpperCase();
       const isCLP = isoCode === 'CLP' || isoCode === 'PEN' || (isoCode !== 'USD' && isoCode !== '' && o.new_askingprice > 1000000);
