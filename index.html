@@ -3715,7 +3715,7 @@ async function fetchDynOpportunities(token) {
   const sel = ['name','opportunityid','cr0b1_kmz','cr0b1_kmz_name',
     'cr0b1_pipelinestatus','cr0b1_offerprice','cr0b1_price','new_askingprice',
     'cr0b1_province_','new_region','cr0b1_ls','cr0b1_notes',
-    'cr0b1_latitud','cr0b1_longitud','new_surfaceha','cr0b1_fieldtype',
+    'cr0b1_latitud','cr0b1_longitud','new_surfaceha',
     'transactioncurrencyid','cr0b1_price_base'].join(',');
   let url = `${DYN_CONFIG.dynamics}/api/data/v9.2/opportunities?$select=${sel}&$expand=transactioncurrencyid($select=isocurrencycode,currencyname)&$orderby=name asc`;
   let all = [];
