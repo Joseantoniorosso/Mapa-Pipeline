@@ -3691,6 +3691,27 @@ const DYN_REGION_MAP = {
   500260003:'México',
 };
 
+const DYN_PROVINCE_MAP = {
+  500260000:'Arica', 500260001:'Parinacota', 500260002:'Iquique',
+  500260003:'Del Tamarugal', 500260004:'Tocopilla', 500260005:'El Loa',
+  500260006:'Antofagasta', 500260007:'Chañaral', 500260008:'Copiapó',
+  500260009:'Huasco', 500260010:'Elqui', 500260011:'Limarí',
+  500260012:'Choapa', 500260013:'Petorca', 500260014:'Los Andes',
+  500260015:'San Felipe', 500260016:'Quillota', 500260017:'Valparaíso',
+  500260018:'San Antonio', 500260019:'Isla de Pascua', 500260020:'Cachapoal',
+  500260021:'Colchagua', 500260022:'Cardenal Caro', 500260023:'Curicó',
+  500260024:'Talca', 500260025:'Linares', 500260026:'Cauquenes',
+  500260027:'Ñuble', 500260028:'Biobío', 500260029:'Concepción',
+  500260030:'Arauco', 500260031:'Malleco', 500260032:'Cautín',
+  500260033:'Valdivia', 500260034:'Ranco', 500260035:'Osorno',
+  500260036:'Llanquihue', 500260037:'Chiloé', 500260038:'Palena',
+  500260039:'Coihaique', 500260040:'Aisén', 500260041:'General Carrera',
+  500260042:'Capitán Prat', 500260043:'Última Esperanza', 500260044:'Magallanes',
+  500260045:'Tierra del Fuego', 500260046:'Antártica', 500260047:'Santiago',
+  500260048:'Chacabuco', 500260049:'Cordillera', 500260050:'Maipo',
+  500260051:'Melipilla', 500260052:'Talagante',
+};
+
 let dynMsal = null;
 let dynAccount = null;
 
@@ -3739,7 +3760,8 @@ async function fetchDynOpportunities(token) {
     'cr0b1_pipelinestatus','cr0b1_offerprice','cr0b1_price','new_askingprice',
     'cr0b1_province_','new_region','cr0b1_ls','cr0b1_notes',
     'cr0b1_latitud','cr0b1_longitud','new_surfaceha',
-    'transactioncurrencyid','cr0b1_price_base'].join(',');
+    'transactioncurrencyid','cr0b1_price_base',
+    '_parentaccountid_value'].join(',');
   let url = `${DYN_CONFIG.dynamics}/api/data/v9.2/opportunities?$select=${sel}&$expand=transactioncurrencyid($select=isocurrencycode,currencyname)&$orderby=name asc`;
   let all = [];
   while (url) {
@@ -3943,9 +3965,11 @@ async function syncDynamics() {
       const price = rawPrice ? (isCLP ? Math.round(rawPrice / _dynTc) : rawPrice) : null;
       const regionName = o.new_region ? (DYN_REGION_MAP[o.new_region] || String(o.new_region)) : '';
       // cr0b1_province_ is the commune/zone field
-      const zoneName = o.cr0b1_province_ ? String(o.cr0b1_province_) : '';
+      const provinceVal = o.cr0b1_province_;
+      const zoneName = provinceVal != null ? (DYN_PROVINCE_MAP[provinceVal] || String(provinceVal)) : '';
       const areaHaFromDyn = o.new_surfaceha || null;
-      return { stageId, fieldTypeId, price, regionName, zoneName, areaHaFromDyn };
+      const accountName = o['_parentaccountid_value@OData.Community.Display.V1.FormattedValue'] || '';
+      return { stageId, fieldTypeId, price, regionName, zoneName, accountName, areaHaFromDyn };
     }
 
    // ── Process fields WITH KMZ — parallel batches ───────────────
@@ -3983,7 +4007,7 @@ async function syncDynamics() {
       const results = await Promise.all(batch.map((o, j) => processOneKmz(o, i+j)));
 
       for (const { o, kmzName, kmzUnchanged, polygons, lines, points, existing } of results) {
-        const { stageId, fieldTypeId, price, regionName, zoneName, areaHaFromDyn } = extractOppData(o);
+        const { stageId, fieldTypeId, price, regionName, zoneName, accountName, areaHaFromDyn } = extractOppData(o);
         if (existing) {
           if (!kmzUnchanged) { existing.polygons = polygons; existing.lines = lines; existing.points = points; }
           existing.stage = stageId || existing.stage;
@@ -3991,6 +4015,7 @@ async function syncDynamics() {
           if (price) existing.priceTotal = price;
           if (regionName) existing.region = regionName;
           if (zoneName) existing.comuna = zoneName;
+          if (accountName) existing.account = accountName;
           if (areaHaFromDyn) existing.areaHa = areaHaFromDyn;
           if (o.cr0b1_ls) existing.ls = o.cr0b1_ls;
           if (o.cr0b1_notes) existing.notes = o.cr0b1_notes;
@@ -4010,6 +4035,7 @@ async function syncDynamics() {
             priceTotal: price,
             region: regionName,
             comuna: zoneName,
+            account: accountName,
             areaHa: areaHaFromDyn || areaHa || 0,
             ls: o.cr0b1_ls || null,
             notes: o.cr0b1_notes || '',
@@ -4030,7 +4056,7 @@ async function syncDynamics() {
       const o = withoutKmz[i];
       setDynProgress(85 + Math.round((i/Math.max(withoutKmz.length,1))*10), `Sin KMZ: ${o.name||'Predio'}...`);
 
-      const { stageId, fieldTypeId, price, regionName, zoneName, areaHaFromDyn } = extractOppData(o);
+      const { stageId, fieldTypeId, price, regionName, zoneName, accountName, areaHaFromDyn } = extractOppData(o);
       let points = [];
       if (o.cr0b1_latitud && o.cr0b1_longitud) points = [[o.cr0b1_latitud, o.cr0b1_longitud]];
 
@@ -4043,6 +4069,7 @@ async function syncDynamics() {
         if (price) existing.priceTotal = price;
         if (regionName) existing.region = regionName;
         if (zoneName) existing.comuna = zoneName;
+        if (accountName) existing.account = accountName;
         if (areaHaFromDyn) existing.areaHa = areaHaFromDyn;
         if (o.cr0b1_ls) existing.ls = o.cr0b1_ls;
         if (o.cr0b1_notes) existing.notes = o.cr0b1_notes;
@@ -4059,6 +4086,7 @@ async function syncDynamics() {
           priceTotal: price,
           region: regionName,
           comuna: zoneName,
+          account: accountName,
           areaHa: areaHaFromDyn || 0,
           ls: o.cr0b1_ls || null,
           notes: o.cr0b1_notes || '',
