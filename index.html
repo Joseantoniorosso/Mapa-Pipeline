@@ -27,7 +27,7 @@ header{display:flex;flex-direction:column;background:#1a1a18;flex-shrink:0;borde
 .hdr-bot{display:flex;align-items:center;padding:0 18px;height:34px;gap:6px;overflow-x:auto;}
 .hdr-bot::-webkit-scrollbar{display:none;}
 .logo{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none;}
-.logo-img{height:32px;filter:brightness(0) invert(1);opacity:.45;}
+.logo-img{height:36px;filter:none;opacity:.85;}
 .logo-sep{width:1px;height:16px;background:#3a3a37;flex-shrink:0;}
 .logo-text{font-family:Consolas,Menlo,monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8a8a84;white-space:nowrap;}
 .hdr-spacer{flex:1;}
@@ -446,7 +446,7 @@ body.presentation .pres-exit{display:block;}
             <svg class="fgrp-chev" width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
           </div>
           <div class="fgrp-body" id="fgrp-body-cuenta">
-            <div id="broker-list" style="display:flex;flex-direction:column;gap:1px;padding:0 2px 6px"></div>
+            <div id="broker-list" style="display:flex;flex-direction:column;gap:1px;padding:0 2px 6px;max-height:180px;overflow-y:auto"></div>
           </div>
         </div>
 
