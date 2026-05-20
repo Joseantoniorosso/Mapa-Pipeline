@@ -3790,7 +3790,7 @@ async function fetchDynOpportunities(token) {
     'cr0b1_province','new_region','cr0b1_ls','cr0b1_notes',
     'cr0b1_latitud','cr0b1_longitud','new_surfaceha',
     'transactioncurrencyid','cr0b1_price_base',
-    '_parentaccountid_value','cr0b1_Priority'].join(',');
+    '_parentaccountid_value','cr0b1_priority'].join(',');
   let url = `${DYN_CONFIG.dynamics}/api/data/v9.2/opportunities?$select=${sel}&$expand=transactioncurrencyid($select=isocurrencycode,currencyname)&$orderby=name asc`;
   let all = [];
   while (url) {
@@ -3998,7 +3998,7 @@ async function syncDynamics() {
       const areaHaFromDyn = o.new_surfaceha || null;
       const accountName = o['_parentaccountid_value@OData.Community.Display.V1.FormattedValue'] || '';
       // Priority: cr0b1_Priority option set — formatted value gives "1. High", "2. Neutral", "3. Low"
-      const priorityRaw = o['cr0b1_Priority@OData.Community.Display.V1.FormattedValue'] || '';
+      const priorityRaw = o['cr0b1_priority@OData.Community.Display.V1.FormattedValue'] || '';
       const priorityName = priorityRaw.replace(/^\d+\.\s*/,'').trim(); // strip "1. " prefix
       return { stageId, fieldTypeId, price, regionName, zoneName, accountName, priorityName, areaHaFromDyn };
     }
