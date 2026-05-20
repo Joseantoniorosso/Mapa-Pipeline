@@ -3787,7 +3787,7 @@ function showDynOverlay(show) {
 async function fetchDynOpportunities(token) {
   const sel = ['name','opportunityid','cr0b1_kmz','cr0b1_kmz_name',
     'cr0b1_pipelinestatus','cr0b1_offerprice','cr0b1_price','new_askingprice',
-    'cr0b1_Province','new_region','cr0b1_ls','cr0b1_notes',
+    'cr0b1_province','new_region','cr0b1_ls','cr0b1_notes',
     'cr0b1_latitud','cr0b1_longitud','new_surfaceha',
     'transactioncurrencyid','cr0b1_price_base',
     '_parentaccountid_value','cr0b1_Priority'].join(',');
@@ -3994,7 +3994,7 @@ async function syncDynamics() {
       const price = rawPrice ? (isCLP ? Math.round(rawPrice / _dynTc) : rawPrice) : null;
       const regionName = o.new_region ? (DYN_REGION_MAP[o.new_region] || String(o.new_region)) : '';
       // cr0b1_Province is a plain text field with the zone/commune name
-      const zoneName = o.cr0b1_Province ? String(o.cr0b1_Province).trim() : '';
+      const zoneName = o.cr0b1_province ? String(o.cr0b1_province).trim() : '';
       const areaHaFromDyn = o.new_surfaceha || null;
       const accountName = o['_parentaccountid_value@OData.Community.Display.V1.FormattedValue'] || '';
       // Priority: cr0b1_Priority option set — formatted value gives "1. High", "2. Neutral", "3. Low"
