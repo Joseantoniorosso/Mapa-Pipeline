@@ -27,7 +27,7 @@ header{display:flex;flex-direction:column;background:#1a1a18;flex-shrink:0;borde
 .hdr-bot{display:flex;align-items:center;padding:0 18px;height:34px;gap:6px;overflow-x:auto;}
 .hdr-bot::-webkit-scrollbar{display:none;}
 .logo{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none;}
-.logo-img{height:22px;filter:brightness(0) invert(1);opacity:.9;}
+.logo-img{height:32px;filter:brightness(0) invert(1);opacity:.45;}
 .logo-sep{width:1px;height:16px;background:#3a3a37;flex-shrink:0;}
 .logo-text{font-family:Consolas,Menlo,monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#8a8a84;white-space:nowrap;}
 .hdr-spacer{flex:1;}
@@ -446,11 +446,7 @@ body.presentation .pres-exit{display:block;}
             <svg class="fgrp-chev" width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
           </div>
           <div class="fgrp-body" id="fgrp-body-cuenta">
-            <div style="display:flex;gap:4px;align-items:center;padding:0 2px 6px">
-              <input id="filter-account" type="text" placeholder="Ej: Farm Brokers" oninput="applyFilters()"
-                style="flex:1;padding:4px 7px;border:1px solid var(--border);border-radius:4px;background:var(--paper);font-family:Consolas,Menlo,monospace;font-size:9px;color:var(--ink);outline:none">
-              <button onclick="document.getElementById('filter-account').value='';applyFilters()" style="padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--muted);font-size:10px;cursor:pointer;line-height:1">×</button>
-            </div>
+            <div id="broker-list" style="display:flex;flex-direction:column;gap:1px;padding:0 2px 6px"></div>
           </div>
         </div>
 
@@ -1235,7 +1231,7 @@ function loadFromStorage(){
 // ════════════════════════════════════════════════════════════════
 // FILTERS + SORT
 // ════════════════════════════════════════════════════════════════
-let activeCropF=new Set(),activeStageF=new Set(),activeTypeF=new Set(),activeRegionF=new Set(),searchQ='';
+let activeCropF=new Set(),activeStageF=new Set(),activeTypeF=new Set(),activeRegionF=new Set(),activeBrokerF=new Set(),searchQ='';
 let currentView='map';
 
 function renderChips(){
@@ -1265,6 +1261,9 @@ function renderChips(){
   // Regions
   const usedRegions=[...new Set(fields.map(f=>f.region).filter(Boolean))].sort();
   renderFlist('region-list',usedRegions.map(r=>({id:r,label:r,color:null})),activeRegionF,null,r=>fields.filter(f=>f.region===r).length);
+  // Brokers
+  const usedBrokers=[...new Set(fields.map(f=>f.account).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  renderFlist('broker-list',usedBrokers.map(r=>({id:r,label:r,color:null})),activeBrokerF,null,r=>fields.filter(f=>f.account===r).length);
   // Update counts on headers
   function updCount(grpId,set){
     const el=document.getElementById('fgrp-count-'+grpId);
@@ -1272,10 +1271,10 @@ function renderChips(){
     el.textContent=set.size;
     el.classList.toggle('show',set.size>0);
   }
-  updCount('cultivo',activeCropF);updCount('etapa',activeStageF);updCount('tipo',activeTypeF);updCount('region',activeRegionF);
+  updCount('cultivo',activeCropF);updCount('etapa',activeStageF);updCount('tipo',activeTypeF);updCount('region',activeRegionF);updCount('cuenta',activeBrokerF);
 }
 function toggleF(kind,id){
-  const map={'crop-list':activeCropF,'stage-list':activeStageF,'type-list':activeTypeF,'region-list':activeRegionF,'crop':activeCropF,'stage':activeStageF,'type':activeTypeF,'region':activeRegionF};
+  const map={'crop-list':activeCropF,'stage-list':activeStageF,'type-list':activeTypeF,'region-list':activeRegionF,'broker-list':activeBrokerF,'crop':activeCropF,'stage':activeStageF,'type':activeTypeF,'region':activeRegionF};
   const s=map[kind];if(!s)return;
   s.has(id)?s.delete(id):s.add(id);renderChips();applyFilters();
 }
@@ -1317,8 +1316,7 @@ function applyFilters(){
     const mS=activeStageF.size===0||activeStageF.has(f.stage);
     const mT=activeTypeF.size===0||activeTypeF.has(f.fieldType);
     const mR=activeRegionF.size===0||activeRegionF.has(f.region);
-    const filterAcct=(document.getElementById('filter-account')?.value||'').trim().toLowerCase();
-    const mA=!filterAcct||(f.account||'').toLowerCase().includes(filterAcct);
+    const mA=activeBrokerF.size===0||activeBrokerF.has(f.account||'');
     // Price filter — only apply if at least one bound is set
     let mP=true;
     if(priceMin!==null||priceMax!==null){
