@@ -1324,8 +1324,7 @@ function renderChips(){
   updCount('cultivo',activeCropF);updCount('etapa',activeStageF);updCount('tipo',activeTypeF);updCount('region',activeRegionF);updCount('cuenta',activeBrokerF);
 }
 function toggleF(kind,id){
-  const map={'crop-list':activeCropF,'stage-list':activeStageF,'type-list':activeTypeF,'region-list':activeRegionF,'broker-list':activeBrokerF,'crop':activeCropF,'stage':activeStageF,'type':activeTypeF,'region':activeRegionF};
-  const s=map[kind];if(!s)return;
+const map={'crop-list':activeCropF,'stage-list':activeStageF,'type-list':activeTypeF,'region-list':activeRegionF,'broker-list':activeBrokerF,'crop':activeCropF,'stage':activeStageF,'type':activeTypeF,'region':activeRegionF,'broker':activeBrokerF};  const s=map[kind];if(!s)return;
   s.has(id)?s.delete(id):s.add(id);renderChips();applyFilters();
 }
 function toggleFgrp(id){
